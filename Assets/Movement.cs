@@ -1,5 +1,7 @@
+using Cinemachine;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -17,12 +19,24 @@ public class Movement : MonoBehaviour
     [SerializeField] float _jumpHeight;
     [SerializeField] public float _gravityMultiplier = 1.0f;
     [SerializeField] float _gravity = -9.81f;
-
-
     [SerializeField] LayerMask _groundLayer;
     [SerializeField] Transform _groundCheck;
     [SerializeField] float _groundCheckHeight = 0.3f;
+    [SerializeField] private float coyoteTime = 0.2f;
+    private float coyoteTimeCounter;
+
     float velocity;
+
+    [Header("Camera")]
+    [SerializeField] bool isFirstPerson = false;
+    [SerializeField] CinemachineVirtualCamera _fpCamera;
+    [SerializeField] CinemachineFreeLook _tpCamera;
+
+
+
+    [Header("Animation")]
+    [SerializeField] Animator _animator;
+
 
 
     private InputMain _inputActions;
@@ -36,10 +50,12 @@ public class Movement : MonoBehaviour
     private float turnSpeed;
     private float currentSpeed;
 
+    [Header("State")]
     public bool isRunning;
     public bool isAim;
     public bool isGrounded;
     public bool isFalling;
+
 
 
     private void Awake()
@@ -55,16 +71,58 @@ public class Movement : MonoBehaviour
 
     private void Update()
     {
+        if (_inputActions.Player.Roll.WasPerformedThisFrame())
+        {
+            ChangeCamera();
+        }
+
+        if (isFirstPerson)
+        {
+            float yaw = cameraTransform.eulerAngles.y;
+            transform.rotation = Quaternion.Euler(0, yaw, 0);
+        }
+
         GroundCheck();
         moveInput = _moveAction.ReadValue<Vector2>();
         LookInput = _lookAction.ReadValue<Vector2>();
         GravityandJump();
         Move();
+
+
+        _animator.SetFloat("Speed", currentSpeed / _speed);
+    }
+
+    void ChangeCamera()
+    {
+        isFirstPerson = !isFirstPerson;
+
+        if(isFirstPerson)
+        {
+            _fpCamera.enabled = true;
+            _tpCamera.enabled = false;
+            _fpCamera.GetCinemachineComponent<CinemachinePOV>().m_HorizontalAxis.Value = _tpCamera.m_XAxis.Value;
+
+        }
+        else
+        {
+            _fpCamera.enabled = false;
+            _tpCamera.enabled = true;
+            _tpCamera.m_XAxis.Value = 0.0f;
+        }
+
     }
 
     void GroundCheck()
     {
         isGrounded = Physics.Raycast(_groundCheck.position, Vector3.down, _groundCheckHeight, _groundLayer);
+        if (isGrounded)
+        {
+            coyoteTimeCounter = coyoteTime;
+        }
+        else
+        {
+            coyoteTimeCounter -= Time.deltaTime;
+        }
     }
 
 
@@ -92,12 +150,14 @@ public class Movement : MonoBehaviour
             isFalling = false;
         }
 
-        if (isGrounded && _inputActions.Player.Jump.WasPerformedThisFrame() && !isAim && _gravityMultiplier != 0)
+        if (coyoteTimeCounter > 0 && _inputActions.Player.Jump.WasPerformedThisFrame() && !isAim && _gravityMultiplier != 0)
         {
+            _animator.SetTrigger("Jump");
             velocity = Mathf.Sqrt(_jumpHeight * -2f * _gravity * _gravityMultiplier);
+            coyoteTimeCounter = 0;
         }
 
-        characterController.Move(Vector3.up * velocity * Time.deltaTime);
+        characterController.Move(Time.deltaTime * velocity * Vector3.up);
     }
 
 
@@ -107,14 +167,24 @@ public class Movement : MonoBehaviour
         {
 
             currentSpeed = Mathf.Lerp(currentSpeed, _speed, Time.deltaTime * _accleration);
-            float targetAngle = Mathf.Atan2(moveInput.x, moveInput.y) * Mathf.Rad2Deg + cameraTransform.eulerAngles.y;
-            float smoothedAngle = Mathf.SmoothDampAngle(transform.eulerAngles.y, targetAngle, ref turnSpeed, _turnTime);
+            if (isFirstPerson) 
+            {
 
-            transform.rotation = Quaternion.Euler(0, smoothedAngle, 0);
-            Vector3 moveDirection = Quaternion.Euler(0, smoothedAngle, 0) * Vector3.forward;
+               
 
+                Vector3 moveDirection = transform.forward * moveInput.y + transform.right * moveInput.x;
+                characterController.Move(currentSpeed * Time.deltaTime * moveDirection.normalized);
+            }
+            else 
+            {
+                float targetAngle = Mathf.Atan2(moveInput.x, moveInput.y) * Mathf.Rad2Deg + cameraTransform.eulerAngles.y;
+                float smoothedAngle = Mathf.SmoothDampAngle(transform.eulerAngles.y, targetAngle, ref turnSpeed, _turnTime);
 
-            characterController.Move(currentSpeed * Time.deltaTime * moveDirection.normalized);
+                transform.rotation = Quaternion.Euler(0, smoothedAngle, 0);
+                Vector3 moveDirection = Quaternion.Euler(0, smoothedAngle, 0) * Vector3.forward;
+
+                characterController.Move(currentSpeed * Time.deltaTime * moveDirection.normalized);
+            }
         }
         else
         {
