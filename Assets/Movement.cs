@@ -67,6 +67,7 @@ public class Movement : MonoBehaviour
     {
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Locked;
+        ChangeCamera();
     }
 
     private void Update()
