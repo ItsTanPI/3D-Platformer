@@ -28,7 +28,7 @@ public class Movement : MonoBehaviour
     float velocity;
 
     [Header("Camera")]
-    [SerializeField] bool isFirstPerson = false;
+    public bool isFirstPerson = false;
     [SerializeField] CinemachineVirtualCamera _fpCamera;
     [SerializeField] CinemachineFreeLook _tpCamera;
 
@@ -76,6 +76,13 @@ public class Movement : MonoBehaviour
         {
             ChangeCamera();
         }
+
+        if (_inputActions.Player.Fire.IsPressed())
+        {
+            _animator.SetTrigger("Shoot");
+            Debug.Log("Hello");
+        }
+
 
         if (isFirstPerson)
         {
@@ -210,7 +217,7 @@ public class Movement : MonoBehaviour
         _inputActions.Player.Look.Enable();
         _lookAction = _inputActions.Player.Look;
 
-        _inputActions.Player.Aim.Enable();
+        _inputActions.Player.Fire.Enable();
         _inputActions.Player.Jump.Enable();
         _inputActions.Player.Roll.Enable();
     }
@@ -218,7 +225,7 @@ public class Movement : MonoBehaviour
     private void OnDisable()
     {
         _inputActions.Player.Move.Disable();
-        _inputActions.Player.Aim.Disable();
+        _inputActions.Player.Fire   .Disable();
         _inputActions.Player.Jump.Disable();
         _inputActions.Player.Look.Enable();
         _inputActions.Player.Roll.Disable();
